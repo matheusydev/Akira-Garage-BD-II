@@ -261,33 +261,6 @@ INSERT INTO OS_PECA (ID_OS_PECA, ID_OS, ID_PECA, QUANTIDADE) VALUES
 (11, 9, 4, 1),
 (12, 10, 2, 2);
 
--- MOSTRAR TODAS AS TABELAS
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema='public' 
-AND table_type='BASE TABLE';   
-
--- DELETAR TODAS AS TABELAS
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-GRANT ALL ON SCHEMA public TO postgres;
-GRANT ALL ON SCHEMA public TO public;
-COMMENT ON SCHEMA public IS 'standard public schema';   
-
--- SELECTS
-SELECT * FROM VEICULO;
-SELECT * FROM CARGO;
-SELECT * FROM FUNCIONARIO;
-SELECT * FROM FABRICANTE;
-SELECT * FROM PECA;
-SELECT * FROM MODELO;
-SELECT * FROM POSSE;
-SELECT * FROM CLIENTE;
-SELECT * FROM SERVICO;
-SELECT * FROM OS;
-SELECT * FROM OS_SERVICO;
-SELECT * FROM OS_PECA;
-
 --- =========================================
 -- VIEWS
 -- =========================================
@@ -1500,3 +1473,34 @@ CREATE USER erwin_gerente      WITH PASSWORD 'gerente1234'   IN ROLE role_gerent
 CREATE USER sakamoto_atendente WITH PASSWORD 'atendente1234' IN ROLE role_atendente;
 CREATE USER winry_mecanico     WITH PASSWORD 'mecanico1234'  IN ROLE role_mecanico;
 CREATE USER krauser_cliente    WITH PASSWORD 'cliente1234'   IN ROLE role_cliente;
+
+-- =========================================
+-- TESTES
+-- =========================================
+
+-- MOSTRAR TODAS AS TABELAS
+-- SELECT table_name 
+-- FROM information_schema.tables 
+-- WHERE table_schema='public' 
+-- AND table_type='BASE TABLE';   
+
+-- DELETAR TODAS AS TABELAS
+-- DROP SCHEMA public CASCADE;
+-- CREATE SCHEMA public;
+-- GRANT ALL ON SCHEMA public TO postgres;
+-- GRANT ALL ON SCHEMA public TO public;
+-- COMMENT ON SCHEMA public IS 'standard public schema';   
+
+-- SELECTS
+-- SELECT * FROM VEICULO;
+-- SELECT * FROM CARGO;
+-- SELECT * FROM FUNCIONARIO;
+-- SELECT * FROM FABRICANTE;
+-- SELECT * FROM PECA;
+-- SELECT * FROM MODELO;
+-- SELECT * FROM POSSE;
+-- SELECT * FROM CLIENTE;
+-- SELECT * FROM SERVICO;
+-- SELECT * FROM OS;
+-- SELECT * FROM OS_SERVICO;
+-- SELECT * FROM OS_PECA;
