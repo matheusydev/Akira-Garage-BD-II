@@ -1,332 +1,390 @@
--- =========================================
--- Projeto final completo do banco de dados
--- =========================================
-
--- CRIAÇÃO DAS TABELAS
-CREATE TABLE FABRICANTE(
-ID_FABRICANTE INT NOT NULL PRIMARY KEY,
-NOME VARCHAR(50) NOT NULL);
-
-CREATE TABLE MODELO(
-ID_MODELO INT NOT NULL PRIMARY KEY,
-ID_FABRICANTE INT NOT NULL REFERENCES FABRICANTE(ID_FABRICANTE),
-NOME_MARCA VARCHAR(50) NOT NULL,
-NOME VARCHAR(50) NOT NULL);
-
-CREATE TABLE CLIENTE(
-ID_CLIENTE INT NOT NULL PRIMARY KEY,
-CPF VARCHAR(11)  UNIQUE NOT NULL,
-NOME VARCHAR(50) NOT NULL,
-TELEFONE VARCHAR(13) NOT NULL,
-EMAIL VARCHAR(50) NOT NULL,
-CONSTRAINT CPF_TAMANHO CHECK (CHAR_LENGTH(CPF) = 11),
-CONSTRAINT TELEFONE_TAMANHO CHECK (CHAR_LENGTH(TELEFONE) BETWEEN 12 AND 13));
-
-CREATE TABLE PECA(
-ID_PECA INT NOT NULL PRIMARY KEY,
-ID_FABRICANTE INT NOT NULL REFERENCES FABRICANTE(ID_FABRICANTE),
-NOME VARCHAR(50) NOT NULL,
-VALOR_UNITARIO FLOAT NOT NULL CHECK (VALOR_UNITARIO > 0),
-ESTOQUE INT NOT NULL CHECK (ESTOQUE >= 0));
-
-CREATE TABLE CARGO(
-ID_CARGO INT NOT NULL PRIMARY KEY,
-NOME VARCHAR(50) NOT NULL,
-COMISSAO FLOAT NOT NULL);
-
-CREATE TABLE FUNCIONARIO(
-ID_FUNCIONARIO INT NOT NULL PRIMARY KEY,
-ID_CARGO INT NOT NULL REFERENCES CARGO(ID_CARGO),
-CPF VARCHAR(11)  UNIQUE NOT NULL,
-NOME VARCHAR(50) NOT NULL,
-SALARIO FLOAT NOT NULL,
-CONSTRAINT CPF_TAMANHO CHECK (CHAR_LENGTH(CPF) = 11),
-CONSTRAINT SALARIO_MINIMO CHECK (SALARIO >= 1621.00));
-
-CREATE TABLE SERVICO(
-ID_SERVICO INT NOT NULL PRIMARY KEY,
-ID_FUNCIONARIO INT REFERENCES FUNCIONARIO(ID_FUNCIONARIO),
-DESCRICAO VARCHAR(200),
-VALOR FLOAT NOT NULL CHECK (VALOR > 0));
-
-CREATE TABLE VEICULO(
-ID_VEICULO INT NOT NULL PRIMARY KEY,
-ID_MODELO INT NOT NULL REFERENCES MODELO(ID_MODELO),
-PLACA VARCHAR(7) NOT NULL, 
-ANO INT NOT NULL,
-COR VARCHAR(50) NOT NULL);
-
-CREATE TABLE POSSE(
-ID_POSSE INT NOT NULL PRIMARY KEY,
-ID_VEICULO INT NOT NULL REFERENCES VEICULO(ID_VEICULO),
-ID_CLIENTE INT NOT NULL REFERENCES CLIENTE(ID_CLIENTE),
-UNIQUE(ID_VEICULO, ID_CLIENTE));
+-- ============================================================
+--  BANCO DE DADOS — OFICINA MECÂNICA
+--  Versão organizada e comentada
+--
+--  ÍNDICE DE SEÇÕES:
+--    1. DDL — Criação das tabelas
+--    2. DML — Inserção de dados iniciais
+--    3. VIEWS — Consultas pré-definidas
+--    4. TRIGGERS — Validação e automação
+--    5. FUNÇÕES — CRUD, movimentação e relatórios
+--    6. DCL — Papéis, permissões e usuários
+-- ============================================================
 
 
-CREATE TABLE OS(
-ID_OS INT NOT NULL PRIMARY KEY,
-ID_POSSE INT NOT NULL REFERENCES POSSE(ID_POSSE),
-DT_ABRE_OS DATE NOT NULL DEFAULT CURRENT_DATE,
-DT_FECHA_OS DATE,
-STATUS VARCHAR(1) NOT NULL DEFAULT 'A' CHECK (STATUS = 'A' OR STATUS = 'F'),
-VALOR_FINAL FLOAT NOT NULL DEFAULT 0 CHECK (VALOR_FINAL >= 0),
-DT_HORA_OS TIMESTAMP DEFAULT NOW());
+-- ============================================================
+-- UTILITÁRIOS (executar apenas quando necessário)
+-- ============================================================
 
-CREATE TABLE OS_SERVICO(
-ID_OS_SERVICO INT NOT NULL PRIMARY KEY,
-ID_OS INT NOT NULL REFERENCES OS(ID_OS),
-ID_SERVICO INT NOT NULL REFERENCES SERVICO(ID_SERVICO),
-UNIQUE (ID_OS, ID_SERVICO));
+-- Listar todas as tabelas do schema
+-- SELECT table_name
+-- FROM information_schema.tables
+-- WHERE table_schema = 'public'
+--   AND table_type = 'BASE TABLE';
 
-CREATE TABLE OS_PECA(
-ID_OS_PECA INT NOT NULL PRIMARY KEY,
-ID_OS INT NOT NULL REFERENCES OS(ID_OS),
-ID_PECA INT NOT NULL REFERENCES PECA(ID_PECA),
-QUANTIDADE INT NOT NULL CHECK (QUANTIDADE > 0),
-UNIQUE (ID_OS,ID_PECA));
+-- ATENÇÃO: apaga tudo. Usar só em ambiente de desenvolvimento.
+-- DROP SCHEMA public CASCADE;
+-- CREATE SCHEMA public;
+-- GRANT ALL ON SCHEMA public TO postgres;
+-- GRANT ALL ON SCHEMA public TO public;
+-- COMMENT ON SCHEMA public IS 'standard public schema';
 
--- INSERTS
 
--- FABRICANTE
+-- ============================================================
+-- 1. DDL — CRIAÇÃO DAS TABELAS
+-- ============================================================
+
+-- Fabricantes de veículos e de peças
+CREATE TABLE FABRICANTE (
+    ID_FABRICANTE INT         NOT NULL PRIMARY KEY,
+    NOME          VARCHAR(50) NOT NULL
+);
+
+-- Modelos de veículos, vinculados a um fabricante
+CREATE TABLE MODELO (
+    ID_MODELO    INT         NOT NULL PRIMARY KEY,
+    ID_FABRICANTE INT        NOT NULL REFERENCES FABRICANTE(ID_FABRICANTE),
+    NOME_MARCA   VARCHAR(50) NOT NULL,
+    NOME         VARCHAR(50) NOT NULL
+);
+
+-- Veículos cadastrados, vinculados a um modelo
+CREATE TABLE VEICULO (
+    ID_VEICULO INT         NOT NULL PRIMARY KEY,
+    ID_MODELO  INT         NOT NULL REFERENCES MODELO(ID_MODELO),
+    PLACA      VARCHAR(7)  NOT NULL,
+    ANO        INT         NOT NULL,
+    COR        VARCHAR(50) NOT NULL
+);
+
+-- Cargos dos funcionários (com percentual de comissão)
+CREATE TABLE CARGO (
+    ID_CARGO INT         NOT NULL PRIMARY KEY,
+    NOME     VARCHAR(50) NOT NULL,
+    COMISSAO FLOAT       NOT NULL
+);
+
+-- Funcionários da oficina
+CREATE TABLE FUNCIONARIO (
+    ID_FUNCIONARIO INT         NOT NULL PRIMARY KEY,
+    ID_CARGO       INT         NOT NULL REFERENCES CARGO(ID_CARGO),
+    CPF            VARCHAR(11) UNIQUE NOT NULL,
+    NOME           VARCHAR(50) NOT NULL,
+    SALARIO        FLOAT       NOT NULL,
+    CONSTRAINT CPF_TAMANHO     CHECK (CHAR_LENGTH(CPF) = 11),
+    CONSTRAINT SALARIO_MINIMO  CHECK (SALARIO >= 1621.00)
+);
+
+-- Peças do estoque
+CREATE TABLE PECA (
+    ID_PECA       INT         NOT NULL PRIMARY KEY,
+    ID_FABRICANTE INT         NOT NULL REFERENCES FABRICANTE(ID_FABRICANTE),
+    NOME          VARCHAR(50) NOT NULL,
+    VALOR_UNITARIO FLOAT      NOT NULL CHECK (VALOR_UNITARIO > 0),
+    ESTOQUE       INT         NOT NULL CHECK (ESTOQUE >= 0)
+);
+
+-- Clientes da oficina
+CREATE TABLE CLIENTE (
+    ID_CLIENTE INT         NOT NULL PRIMARY KEY,
+    CPF        VARCHAR(11) UNIQUE NOT NULL,
+    NOME       VARCHAR(50) NOT NULL,
+    TELEFONE   VARCHAR(13) NOT NULL,
+    EMAIL      VARCHAR(50) NOT NULL,
+    CONSTRAINT CPF_TAMANHO      CHECK (CHAR_LENGTH(CPF) = 11),
+    CONSTRAINT TELEFONE_TAMANHO CHECK (CHAR_LENGTH(TELEFONE) BETWEEN 12 AND 13)
+);
+
+-- Relacionamento cliente ↔ veículo (posse)
+CREATE TABLE POSSE (
+    ID_POSSE   INT NOT NULL PRIMARY KEY,
+    ID_VEICULO INT NOT NULL REFERENCES VEICULO(ID_VEICULO),
+    ID_CLIENTE INT NOT NULL REFERENCES CLIENTE(ID_CLIENTE),
+    UNIQUE (ID_VEICULO, ID_CLIENTE)
+);
+
+-- Serviços oferecidos pela oficina
+CREATE TABLE SERVICO (
+    ID_SERVICO   INT          NOT NULL PRIMARY KEY,
+    ID_FUNCIONARIO INT        REFERENCES FUNCIONARIO(ID_FUNCIONARIO),
+    DESCRICAO    VARCHAR(200),
+    VALOR        FLOAT        NOT NULL CHECK (VALOR > 0)
+);
+
+-- Ordens de serviço (OS)
+CREATE TABLE OS (
+    ID_OS       INT          NOT NULL PRIMARY KEY,
+    ID_POSSE    INT          NOT NULL REFERENCES POSSE(ID_POSSE),
+    DT_ABRE_OS  DATE         NOT NULL DEFAULT CURRENT_DATE,
+    DT_FECHA_OS DATE,
+    STATUS      VARCHAR(1)   NOT NULL DEFAULT 'A' CHECK (STATUS IN ('A', 'F')),
+    VALOR_FINAL FLOAT        NOT NULL DEFAULT 0   CHECK (VALOR_FINAL >= 0),
+    DT_HORA_OS  TIMESTAMP    DEFAULT NOW()
+);
+
+-- Serviços vinculados a uma OS (N:N)
+CREATE TABLE OS_SERVICO (
+    ID_OS_SERVICO INT NOT NULL PRIMARY KEY,
+    ID_OS         INT NOT NULL REFERENCES OS(ID_OS),
+    ID_SERVICO    INT NOT NULL REFERENCES SERVICO(ID_SERVICO),
+    UNIQUE (ID_OS, ID_SERVICO)
+);
+
+-- Peças vinculadas a uma OS (N:N)
+CREATE TABLE OS_PECA (
+    ID_OS_PECA INT NOT NULL PRIMARY KEY,
+    ID_OS      INT NOT NULL REFERENCES OS(ID_OS),
+    ID_PECA    INT NOT NULL REFERENCES PECA(ID_PECA),
+    QUANTIDADE INT NOT NULL CHECK (QUANTIDADE > 0),
+    UNIQUE (ID_OS, ID_PECA)
+);
+
+
+-- ============================================================
+-- 2. DML — INSERÇÃO DE DADOS INICIAIS
+-- ============================================================
+
+-- Fabricantes (1–10: montadoras | 11–17: fabricantes de peças)
 INSERT INTO FABRICANTE (ID_FABRICANTE, NOME) VALUES
-(1, 'Fabrica da Toyota'),
-(2, 'Fabrica da Volkswagen'),
-(3, 'Fabrica da Chevrolet'),
-(4, 'Fabrica da Volvo'),
-(5, 'Fabrica da Audi'),
-(6, 'Fabrica da BMW'),
-(7, 'Fabrica da Porsche'),
-(8, 'Fabrica da Ferrari'),
-(9, 'Fabrica da Koenigsegg'),
-(10, 'Fabrica da BYD'),
-(11, 'Bosch'),
-(12, 'Nakata'),
-(13, 'Denso'),
-(14, 'Mahle'),
-(15, 'Axios'),
-(16, 'Fremax'),
-(17, 'Bridgestone');
+    (1,  'Fabrica da Toyota'),
+    (2,  'Fabrica da Volkswagen'),
+    (3,  'Fabrica da Chevrolet'),
+    (4,  'Fabrica da Volvo'),
+    (5,  'Fabrica da Audi'),
+    (6,  'Fabrica da BMW'),
+    (7,  'Fabrica da Porsche'),
+    (8,  'Fabrica da Ferrari'),
+    (9,  'Fabrica da Koenigsegg'),
+    (10, 'Fabrica da BYD'),
+    (11, 'Bosch'),
+    (12, 'Nakata'),
+    (13, 'Denso'),
+    (14, 'Mahle'),
+    (15, 'Axios'),
+    (16, 'Fremax'),
+    (17, 'Bridgestone');
 
--- MODELO
+-- Modelos de veículos
 INSERT INTO MODELO (ID_MODELO, ID_FABRICANTE, NOME_MARCA, NOME) VALUES
-(1, 1, 'Toyota', 'Corolla'),
-(2, 1, 'Toyota', 'Hilux'),
-(3, 2, 'Volkswagen', 'Polo'),
-(4, 2, 'Volkswagen', 'Nivus'),
-(5, 3, 'Chevrolet', 'Opala'),
-(6, 3, 'Chevrolet', 'Prisma'),
-(7, 4, 'Volvo', 'XC60'),
-(8, 4, 'Volvo', 'XC90'),
-(9, 5, 'Audi', 'A3'),
-(10, 5, 'Audi', 'Q5'),
-(11, 6, 'BMW', '320i'),
-(12, 6, 'BMW', 'X1'),
-(13, 7, 'Porsche', '911'),
-(14, 7, 'Porsche', 'Macan'),
-(15, 8, 'Ferrari', 'F8 Tributo'),
-(16, 8, 'Ferrari', 'Roma'),
-(17, 9, 'Koenigsegg', 'Jesko'),
-(18, 9, 'Koenigsegg', 'Agera RS'),
-(19, 10, 'BYD', 'Dolphin'),
-(20, 10, 'BYD', 'Seal');
+    (1,  1,  'Toyota',      'Corolla'),
+    (2,  1,  'Toyota',      'Hilux'),
+    (3,  2,  'Volkswagen',  'Polo'),
+    (4,  2,  'Volkswagen',  'Nivus'),
+    (5,  3,  'Chevrolet',   'Opala'),
+    (6,  3,  'Chevrolet',   'Prisma'),
+    (7,  4,  'Volvo',       'XC60'),
+    (8,  4,  'Volvo',       'XC90'),
+    (9,  5,  'Audi',        'A3'),
+    (10, 5,  'Audi',        'Q5'),
+    (11, 6,  'BMW',         '320i'),
+    (12, 6,  'BMW',         'X1'),
+    (13, 7,  'Porsche',     '911'),
+    (14, 7,  'Porsche',     'Macan'),
+    (15, 8,  'Ferrari',     'F8 Tributo'),
+    (16, 8,  'Ferrari',     'Roma'),
+    (17, 9,  'Koenigsegg',  'Jesko'),
+    (18, 9,  'Koenigsegg',  'Agera RS'),
+    (19, 10, 'BYD',         'Dolphin'),
+    (20, 10, 'BYD',         'Seal');
 
--- CLIENTE
-INSERT INTO CLIENTE (ID_CLIENTE, CPF, NOME, TELEFONE, EMAIL) VALUES
-(1, '11111111111', 'Thiago Elias', '5586999999999', 'Thiago.Elias@email.com'),
-(2, '22222222222', 'João Carlos', '5586888888888', 'joao.carlos@email.com'),
-(3, '33333333333', 'Guilherme Alves', '5586777777777', 'Guilherme.alves@email.com'),
-(4, '44444444444', 'Matheus Ylan', '5586666666666', 'Matheus.Ylan@email.com'),
-(5, '55555555555', 'Max Verstappen', '5586555555555', 'Max.Verstappen@email.com'),
-(6, '66666666666', 'Joseph Joestar', '5586444444444', 'Jojo.BattleTendency@email.com'),
-(7, '77777777777', 'Cristiano Ronaldo', '5586333333333', 'Cristiano.Ronaldo@email.com'),
-(8, '88888888888', 'Steven Stone', '5586222222222', 'Steven.Stone@email.com'),
-(9, '99999999999', 'Trevor Belmont', '5586111111111', 'Trevor.Belmont@email.com'),
-(10, '00000000000', 'Zagreu', '5586000000000', 'Zagreu.Hades@email.com');
-
--- PECA
-INSERT INTO PECA (ID_PECA, ID_FABRICANTE, NOME, VALOR_UNITARIO, ESTOQUE) VALUES
-(1, 11, 'VELA DE IGNIÇÃO', 350.00, 50),
-(2, 11, 'BATERIA AUTOMATIVA', 85.50, 40),
-(3, 12, 'AMORTECEDOR', 190.00, 30),
-(4, 13, 'BICO INJETOR', 540.00, 20),
-(5, 14, 'FILTRO DE ÓLEO', 42.00, 80),
-(6, 15, 'BUCHA DE SUSPENSÃO', 65.00, 50),
-(7, 16, 'DISCO DE FREIO', 220.00, 35),
-(8, 17, 'PNEU', 480.00, 40),
-(9, 12, 'TERMINAL DE DIREÇÃO', 115.00, 30),
-(10, 14, 'PISTÃO DE MOTOR', 95.00, 60);
-
--- CARGO
-INSERT INTO CARGO (ID_CARGO, NOME, COMISSAO) VALUES
-(1, 'Mecânico Senior', 0.75),
-(2, 'Mecânico Pleno', 0.50),
-(3, 'Mecânico Junior', 0.30),
-(4, 'Auxiliar de Mecânico', 0.10),
-(5, 'Eletricista Automotivo', 0.60),
-(6, 'Mecânico Funileiro', 0.40),
-(7, 'Alinhador', 0.25),
-(8, 'Borracheiro', 0.20);
-
--- FUNCIONARIO
-INSERT INTO FUNCIONARIO (ID_FUNCIONARIO, ID_CARGO, CPF, NOME, SALARIO) VALUES
-(1, 1, '11111111111', 'Neymar Junior', 4500.00),
-(2, 2, '22222222222', 'Lewis Hamilton', 3800.00),
-(3, 3, '33333333333', 'Leon Kennedy', 2800.00),
-(4, 4, '44444444444', 'Johnny Joestar', 1800.00),
-(5, 5, '55555555555', 'Vaas Montenegro', 4000.00),
-(6, 6, '66666666666', 'Carl Johnson', 3200.00),
-(7, 7, '77777777777', 'Pierre Stardew Valley', 2500.00),
-(8, 8, '88888888888', 'Monkey D. Luffy', 2200.00),
-(9, 2, '99999999999', 'Ichigo Kurosaki', 3800.00),
-(10, 1, '00000000000', 'Axl Rose', 4600.00);
-
--- SERVICO
-INSERT INTO SERVICO (ID_SERVICO, ID_FUNCIONARIO, DESCRICAO, VALOR) VALUES
-(1, 1, 'Troca de pastilhas de freio e alinhamento', 200.00),
-(2, 5, 'Instalação de kit multimídia', 350.00),
-(3, 6, 'Alinhamento 3D e pintura de para-choque', 400.00),
-(4, 8, 'Troca de pneus e balanceamento', 150.00),
-(5, 2, 'Revisão completa de 10.000km', 600.00),
-(6, 7, 'Alinhamento 3D', 120.00),
-(7, 3, 'Troca de óleo e filtro', 80.00),
-(8, 1, 'Retífica preventiva de motor', 1500.00),
-(9, 9, 'Troca de kit de embreagem', 450.00),
-(10, 4, 'Limpeza de bicos injetores', 180.00);
-
--- VEICULO
+-- Veículos
 INSERT INTO VEICULO (ID_VEICULO, ID_MODELO, PLACA, ANO, COR) VALUES
-(1, 1, 'NEC5146', 2023, 'Cinza'),
-(2, 3, 'MDI0839', 2020, 'Branco'),
-(3, 5, 'IHA2714', 1988, 'Preto'),
-(4, 7, 'MYO4449', 2022, 'Prata'),
-(5, 11, 'LKX9822', 2021, 'Azul'),
-(6, 13, 'HQS1905', 2024, 'Vermelho'),
-(7, 19, 'NBX9018', 2023, 'Branco'),
-(8, 2, 'MVL4749', 2018, 'Prata'),
-(9, 15, 'BTR5075', 2022, 'Amarelo'),
-(10, 10, 'JYE8823', 2021, 'Preto');
+    (1,  1,  'NEC5146', 2023, 'Cinza'),
+    (2,  3,  'MDI0839', 2020, 'Branco'),
+    (3,  5,  'IHA2714', 1988, 'Preto'),
+    (4,  7,  'MYO4449', 2022, 'Prata'),
+    (5,  11, 'LKX9822', 2021, 'Azul'),
+    (6,  13, 'HQS1905', 2024, 'Vermelho'),
+    (7,  19, 'NBX9018', 2023, 'Branco'),
+    (8,  2,  'MVL4749', 2018, 'Prata'),
+    (9,  15, 'BTR5075', 2022, 'Amarelo'),
+    (10, 10, 'JYE8823', 2021, 'Preto');
 
--- INSERT POSSE
-INSERT INTO POSSE (ID_POSSE, ID_VEICULO, ID_CLIENTE) VALUES 
-(1, 1, 1),
-(2, 2, 2),
-(3, 3, 3),
-(4, 4, 4),
-(5, 5, 5),
-(6, 6, 6),
-(7, 7, 7),
-(8, 8, 8),
-(9, 9, 9),
-(10, 10, 10);
+-- Cargos e comissões
+INSERT INTO CARGO (ID_CARGO, NOME, COMISSAO) VALUES
+    (1, 'Mecânico Senior',       0.75),
+    (2, 'Mecânico Pleno',        0.50),
+    (3, 'Mecânico Junior',       0.30),
+    (4, 'Auxiliar de Mecânico',  0.10),
+    (5, 'Eletricista Automotivo',0.60),
+    (6, 'Mecânico Funileiro',    0.40),
+    (7, 'Alinhador',             0.25),
+    (8, 'Borracheiro',           0.20);
 
--- OS
+-- Funcionários
+INSERT INTO FUNCIONARIO (ID_FUNCIONARIO, ID_CARGO, CPF, NOME, SALARIO) VALUES
+    (1,  1, '11111111111', 'Neymar Junior',          4500.00),
+    (2,  2, '22222222222', 'Lewis Hamilton',          3800.00),
+    (3,  3, '33333333333', 'Leon Kennedy',            2800.00),
+    (4,  4, '44444444444', 'Johnny Joestar',          1800.00),
+    (5,  5, '55555555555', 'Vaas Montenegro',         4000.00),
+    (6,  6, '66666666666', 'Carl Johnson',            3200.00),
+    (7,  7, '77777777777', 'Pierre Stardew Valley',   2500.00),
+    (8,  8, '88888888888', 'Monkey D. Luffy',         2200.00),
+    (9,  2, '99999999999', 'Ichigo Kurosaki',         3800.00),
+    (10, 1, '00000000000', 'Axl Rose',                4600.00);
+
+-- Clientes
+INSERT INTO CLIENTE (ID_CLIENTE, CPF, NOME, TELEFONE, EMAIL) VALUES
+    (1,  '11111111111', 'Thiago Elias',      '5586999999999', 'Thiago.Elias@email.com'),
+    (2,  '22222222222', 'João Carlos',       '5586888888888', 'joao.carlos@email.com'),
+    (3,  '33333333333', 'Guilherme Alves',   '5586777777777', 'Guilherme.alves@email.com'),
+    (4,  '44444444444', 'Matheus Ylan',      '5586666666666', 'Matheus.Ylan@email.com'),
+    (5,  '55555555555', 'Max Verstappen',    '5586555555555', 'Max.Verstappen@email.com'),
+    (6,  '66666666666', 'Joseph Joestar',    '5586444444444', 'Jojo.BattleTendency@email.com'),
+    (7,  '77777777777', 'Cristiano Ronaldo', '5586333333333', 'Cristiano.Ronaldo@email.com'),
+    (8,  '88888888888', 'Steven Stone',      '5586222222222', 'Steven.Stone@email.com'),
+    (9,  '99999999999', 'Trevor Belmont',    '5586111111111', 'Trevor.Belmont@email.com'),
+    (10, '00000000000', 'Zagreu',            '5586000000000', 'Zagreu.Hades@email.com');
+
+-- Posses (cada cliente possui um veículo)
+INSERT INTO POSSE (ID_POSSE, ID_VEICULO, ID_CLIENTE) VALUES
+    (1,  1,  1),
+    (2,  2,  2),
+    (3,  3,  3),
+    (4,  4,  4),
+    (5,  5,  5),
+    (6,  6,  6),
+    (7,  7,  7),
+    (8,  8,  8),
+    (9,  9,  9),
+    (10, 10, 10);
+
+-- Peças do estoque
+INSERT INTO PECA (ID_PECA, ID_FABRICANTE, NOME, VALOR_UNITARIO, ESTOQUE) VALUES
+    (1,  11, 'VELA DE IGNIÇÃO',      350.00, 50),
+    (2,  11, 'BATERIA AUTOMATIVA',    85.50, 40),
+    (3,  12, 'AMORTECEDOR',          190.00, 30),
+    (4,  13, 'BICO INJETOR',         540.00, 20),
+    (5,  14, 'FILTRO DE ÓLEO',        42.00, 80),
+    (6,  15, 'BUCHA DE SUSPENSÃO',    65.00, 50),
+    (7,  16, 'DISCO DE FREIO',       220.00, 35),
+    (8,  17, 'PNEU',                 480.00, 40),
+    (9,  12, 'TERMINAL DE DIREÇÃO',  115.00, 30),
+    (10, 14, 'PISTÃO DE MOTOR',       95.00, 60);
+
+-- Serviços disponíveis
+INSERT INTO SERVICO (ID_SERVICO, ID_FUNCIONARIO, DESCRICAO, VALOR) VALUES
+    (1,  1, 'Troca de pastilhas de freio e alinhamento', 200.00),
+    (2,  5, 'Instalação de kit multimídia',              350.00),
+    (3,  6, 'Alinhamento 3D e pintura de para-choque',   400.00),
+    (4,  8, 'Troca de pneus e balanceamento',            150.00),
+    (5,  2, 'Revisão completa de 10.000km',              600.00),
+    (6,  7, 'Alinhamento 3D',                            120.00),
+    (7,  3, 'Troca de óleo e filtro',                     80.00),
+    (8,  1, 'Retífica preventiva de motor',             1500.00),
+    (9,  9, 'Troca de kit de embreagem',                 450.00),
+    (10, 4, 'Limpeza de bicos injetores',                180.00);
+
+-- Ordens de Serviço (STATUS: A = Aberta | F = Fechada)
 INSERT INTO OS (ID_OS, ID_POSSE, DT_ABRE_OS, DT_FECHA_OS, STATUS, VALOR_FINAL) VALUES
-(1, 1, '2026-05-20', '2026-05-25', 'F', 0),
-(2, 2, '2026-05-21', '2026-05-21', 'F', 0),
-(3, 3, '2026-05-22', '2026-05-24', 'F', 0),
-(4, 4, '2026-05-23', '2026-05-23', 'F', 0),
-(5, 5, '2026-05-24', NULL, 'A', 0),
-(6, 6, '2026-05-20', '2026-05-22', 'F', 0),
-(7, 7, '2026-05-22', '2026-05-23', 'F', 0),
-(8, 8, '2026-05-21', '2026-05-21', 'F', 0),
-(9, 9, '2026-05-15', NULL, 'A', 0),
-(10, 10, '2026-05-25', '2026-05-25', 'F', 0);
+    (1,  1,  '2026-05-20', '2026-05-25', 'F', 0),
+    (2,  2,  '2026-05-21', '2026-05-21', 'F', 0),
+    (3,  3,  '2026-05-22', '2026-05-24', 'F', 0),
+    (4,  4,  '2026-05-23', '2026-05-23', 'F', 0),
+    (5,  5,  '2026-05-24', NULL,         'A', 0),
+    (6,  6,  '2026-05-20', '2026-05-22', 'F', 0),
+    (7,  7,  '2026-05-22', '2026-05-23', 'F', 0),
+    (8,  8,  '2026-05-21', '2026-05-21', 'F', 0),
+    (9,  9,  '2026-05-15', NULL,         'A', 0),
+    (10, 10, '2026-05-25', '2026-05-25', 'F', 0);
 
--- OS_SERVICO
+-- Serviços vinculados às OS
 INSERT INTO OS_SERVICO (ID_OS_SERVICO, ID_OS, ID_SERVICO) VALUES
-(1, 1, 1),
-(2, 1, 6),
-(3, 2, 7),
-(4, 3, 3),
-(5, 3, 9),
-(6, 4, 6),
-(7, 5, 5),
-(8, 6, 9),
-(9, 7, 2),
-(10, 8, 4),
-(11, 9, 8),
-(12, 10, 10);
+    (1,  1,  1),
+    (2,  1,  6),
+    (3,  2,  7),
+    (4,  3,  3),
+    (5,  3,  9),
+    (6,  4,  6),
+    (7,  5,  5),
+    (8,  6,  9),
+    (9,  7,  2),
+    (10, 8,  4),
+    (11, 9,  8),
+    (12, 10, 10);
 
--- OS_PECA
+-- Peças vinculadas às OS
 INSERT INTO OS_PECA (ID_OS_PECA, ID_OS, ID_PECA, QUANTIDADE) VALUES
-(1, 1, 1, 2),
-(2, 1, 7, 1),
-(3, 2, 5, 3),
-(4, 3, 9, 1),
-(5, 3, 6, 2),
-(6, 4, 6, 1),
-(7, 5, 1, 1),
-(8, 6, 3, 2),
-(9, 7, 10, 3),
-(10, 8, 8, 1),
-(11, 9, 4, 1),
-(12, 10, 2, 2);
+    (1,  1,  1, 2),
+    (2,  1,  7, 1),
+    (3,  2,  5, 3),
+    (4,  3,  9, 1),
+    (5,  3,  6, 2),
+    (6,  4,  6, 1),
+    (7,  5,  1, 1),
+    (8,  6,  3, 2),
+    (9,  7,  10, 3),
+    (10, 8,  8, 1),
+    (11, 9,  4, 1),
+    (12, 10, 2, 2);
 
--- MOSTRAR TODAS AS TABELAS
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema='public' 
-AND table_type='BASE TABLE';   
 
--- DELETAR TODAS AS TABELAS
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-GRANT ALL ON SCHEMA public TO postgres;
-GRANT ALL ON SCHEMA public TO public;
-COMMENT ON SCHEMA public IS 'standard public schema';   
+-- ============================================================
+-- 3. VIEWS — CONSULTAS PRÉ-DEFINIDAS
+-- ============================================================
 
--- SELECTS
-SELECT * FROM VEICULO;
-SELECT * FROM CARGO;
-SELECT * FROM FUNCIONARIO;
-SELECT * FROM FABRICANTE;
-SELECT * FROM PECA;
-SELECT * FROM MODELO;
-SELECT * FROM POSSE;
-SELECT * FROM CLIENTE;
-SELECT * FROM SERVICO;
-SELECT * FROM OS;
-SELECT * FROM OS_SERVICO;
-SELECT * FROM OS_PECA;
-
---- =========================================
--- VIEWS
--- =========================================
-
+-- View principal: visão completa de uma OS com todos os dados relacionados
 CREATE OR REPLACE VIEW VISUALIZAR_OS AS
-SELECT O.ID_OS,C.NOME CLIENTE,C.CPF,M.NOME_MARCA || ' ' || M.NOME VEICULO,V.PLACA,V.ANO,V.COR,S.DESCRICAO,F.NOME NOME_FABRICANTE,
-PE.NOME PECA,O.DT_ABRE_OS,COALESCE(CAST((DT_FECHA_OS) AS VARCHAR),'NÃO FOI FECHADA') DT_FECHA_OS,
-O.STATUS,COALESCE(VALOR_FINAL,0) VALOR_FINAL,DT_HORA_OS
-FROM OS O JOIN POSSE PO ON O.ID_POSSE = PO.ID_POSSE JOIN CLIENTE C ON PO.ID_CLIENTE = C.ID_CLIENTE 
-JOIN VEICULO V ON PO.ID_VEICULO = V.ID_VEICULO JOIN MODELO M ON M.ID_MODELO = V.ID_MODELO 
-JOIN OS_SERVICO OSS ON OSS.ID_OS = O.ID_OS JOIN SERVICO S ON S.ID_SERVICO = OSS.ID_SERVICO
-JOIN OS_PECA OP ON OP.ID_OS = O.ID_OS JOIN PECA PE ON PE.ID_PECA = OP.ID_PECA
-JOIN FABRICANTE F ON F.ID_FABRICANTE = PE.ID_FABRICANTE;
+SELECT
+    O.ID_OS,
+    C.NOME                                                          AS CLIENTE,
+    C.CPF,
+    M.NOME_MARCA || ' ' || M.NOME                                  AS VEICULO,
+    V.PLACA,
+    V.ANO,
+    V.COR,
+    S.DESCRICAO,
+    F.NOME                                                          AS NOME_FABRICANTE,
+    PE.NOME                                                         AS PECA,
+    O.DT_ABRE_OS,
+    COALESCE(CAST(DT_FECHA_OS AS VARCHAR), 'NÃO FOI FECHADA')      AS DT_FECHA_OS,
+    O.STATUS,
+    COALESCE(VALOR_FINAL, 0)                                        AS VALOR_FINAL,
+    DT_HORA_OS
+FROM OS O
+    JOIN POSSE      PO  ON O.ID_POSSE       = PO.ID_POSSE
+    JOIN CLIENTE    C   ON PO.ID_CLIENTE    = C.ID_CLIENTE
+    JOIN VEICULO    V   ON PO.ID_VEICULO    = V.ID_VEICULO
+    JOIN MODELO     M   ON M.ID_MODELO      = V.ID_MODELO
+    JOIN OS_SERVICO OSS ON OSS.ID_OS        = O.ID_OS
+    JOIN SERVICO    S   ON S.ID_SERVICO     = OSS.ID_SERVICO
+    JOIN OS_PECA    OP  ON OP.ID_OS         = O.ID_OS
+    JOIN PECA       PE  ON PE.ID_PECA       = OP.ID_PECA
+    JOIN FABRICANTE F   ON F.ID_FABRICANTE  = PE.ID_FABRICANTE;
 
+-- Filtros de status sobre a view principal
 CREATE OR REPLACE VIEW VISUALIZAR_OS_ABERTAS AS
-SELECT ID_OS,CLIENTE,CPF,VEICULO,PLACA,ANO,COR,DESCRICAO FROM VISUALIZAR_OS
+SELECT ID_OS, CLIENTE, CPF, VEICULO, PLACA, ANO, COR, DESCRICAO
+FROM VISUALIZAR_OS
 WHERE STATUS = 'A';
 
 CREATE OR REPLACE VIEW VISUALIZAR_OS_FECHADAS AS
-SELECT ID_OS,CLIENTE,CPF,VEICULO,PLACA,ANO,COR,DESCRICAO FROM VISUALIZAR_OS
-WHERE STATUS = 'F'; 
+SELECT ID_OS, CLIENTE, CPF, VEICULO, PLACA, ANO, COR, DESCRICAO
+FROM VISUALIZAR_OS
+WHERE STATUS = 'F';
 
--- View para o Mecânico: OS abertas sem dados pessoais do cliente Remove CPF, EMAIL e TELEFONE — o mecânico não precisa dessas informações.
+-- View para mecânicos: OS abertas sem dados pessoais do cliente
+-- (CPF, e-mail e telefone não são necessários no chão de fábrica)
 CREATE OR REPLACE VIEW VW_OS_ABERTAS_MECANICO AS
-SELECT ID_OS, CLIENTE, VEICULO, PLACA, ANO, COR, DESCRICAO FROM VISUALIZAR_OS WHERE STATUS = 'A';
+SELECT ID_OS, CLIENTE, VEICULO, PLACA, ANO, COR, DESCRICAO
+FROM VISUALIZAR_OS
+WHERE STATUS = 'A';
 
-
--- View para o Atendente: tabela FUNCIONARIO sem a coluna SALARIO O atendente precisa vincular um funcionário a um serviço, mas não tem direito de ver quanto cada colega ganha.
+-- View para atendentes: tabela de funcionários sem a coluna SALÁRIO
+-- (necessária para vincular um funcionário a um serviço)
 CREATE OR REPLACE VIEW VW_FUNCIONARIO_SEM_SALARIO AS
-SELECT ID_FUNCIONARIO, ID_CARGO, CPF, NOME FROM FUNCIONARIO; 
+SELECT ID_FUNCIONARIO, ID_CARGO, CPF, NOME
+FROM FUNCIONARIO;
 
--- =========================================
--- TRIGGERS DE VALIDACAO
--- =========================================
 
--- -------------------
--- TRIGGER: CLIENTE
--- -------------------
+-- ============================================================
+-- 4. TRIGGERS — VALIDAÇÃO E AUTOMAÇÃO
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 4.1 Validação de CLIENTE
+-- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_CLIENTE()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -365,14 +423,11 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER DISPARAR_VALIDAR_CLIENTE
 BEFORE INSERT OR UPDATE ON CLIENTE
-FOR EACH ROW
-EXECUTE PROCEDURE VALIDAR_CLIENTE();
+FOR EACH ROW EXECUTE PROCEDURE VALIDAR_CLIENTE();
 
-SELECT * FROM CLIENTE;
-
--- -------------------
--- TRIGGER: VEICULO
--- -------------------
+-- ------------------------------------------------------------
+-- 4.2 Validação de VEICULO
+-- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_VEICULO()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -407,12 +462,11 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER DISPARAR_VALIDAR_VEICULO
 BEFORE INSERT OR UPDATE ON VEICULO
-FOR EACH ROW
-EXECUTE PROCEDURE VALIDAR_VEICULO();
+FOR EACH ROW EXECUTE PROCEDURE VALIDAR_VEICULO();
 
--- -------------------
--- TRIGGER: FUNCIONARIO
--- -------------------
+-- ------------------------------------------------------------
+-- 4.3 Validação de FUNCIONARIO
+-- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_FUNCIONARIO()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -449,12 +503,11 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER DISPARAR_VALIDAR_FUNCIONARIO
 BEFORE INSERT OR UPDATE ON FUNCIONARIO
-FOR EACH ROW
-EXECUTE PROCEDURE VALIDAR_FUNCIONARIO();
+FOR EACH ROW EXECUTE PROCEDURE VALIDAR_FUNCIONARIO();
 
--- -------------------
--- TRIGGER: PECA
--- -------------------
+-- ------------------------------------------------------------
+-- 4.4 Validação de PECA
+-- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_PECA()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -481,12 +534,11 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER DISPARAR_VALIDAR_PECA
 BEFORE INSERT OR UPDATE ON PECA
-FOR EACH ROW
-EXECUTE PROCEDURE VALIDAR_PECA();
+FOR EACH ROW EXECUTE PROCEDURE VALIDAR_PECA();
 
--- -------------------
--- TRIGGER: SERVICO
--- -------------------
+-- ------------------------------------------------------------
+-- 4.5 Validação de SERVICO
+-- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_SERVICO()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -511,11 +563,10 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER DISPARAR_VALIDAR_SERVICO
 BEFORE INSERT OR UPDATE ON SERVICO
-FOR EACH ROW
-EXECUTE PROCEDURE VALIDAR_SERVICO();
+FOR EACH ROW EXECUTE PROCEDURE VALIDAR_SERVICO();
 
---- ------------------------------------------------------------
--- TRIGGER: Validação de OS
+-- ------------------------------------------------------------
+-- 4.6 Validação de OS
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_OS()
 RETURNS TRIGGER AS $$
@@ -547,7 +598,7 @@ BEFORE INSERT OR UPDATE ON OS
 FOR EACH ROW EXECUTE PROCEDURE VALIDAR_OS();
 
 -- ------------------------------------------------------------
--- TRIGGER: OS_PECA — INSERT: baixa de estoque e soma no VALOR_FINAL
+-- 4.7 OS_PECA — INSERT: baixa de estoque e soma no VALOR_FINAL
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_E_BAIXAR_ESTOQUE_OS_PECA()
 RETURNS TRIGGER AS $$
@@ -592,7 +643,7 @@ BEFORE INSERT ON OS_PECA
 FOR EACH ROW EXECUTE PROCEDURE VALIDAR_E_BAIXAR_ESTOQUE_OS_PECA();
 
 -- ------------------------------------------------------------
--- TRIGGER: OS_PECA — UPDATE: ajuste de estoque e VALOR_FINAL pelo delta
+-- 4.8 OS_PECA — UPDATE: ajuste de estoque e VALOR_FINAL pelo delta
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_E_AJUSTAR_QUANTIDADE_OS_PECA()
 RETURNS TRIGGER AS $$
@@ -643,7 +694,7 @@ BEFORE UPDATE ON OS_PECA
 FOR EACH ROW EXECUTE PROCEDURE VALIDAR_E_AJUSTAR_QUANTIDADE_OS_PECA();
 
 -- ------------------------------------------------------------
--- TRIGGER: OS_PECA — DELETE: devolução de estoque e desconto no VALOR_FINAL
+-- 4.9 OS_PECA — DELETE: devolução de estoque e desconto no VALOR_FINAL
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION REVERTER_ESTOQUE_OS_PECA()
 RETURNS TRIGGER AS $$
@@ -674,7 +725,7 @@ BEFORE DELETE ON OS_PECA
 FOR EACH ROW EXECUTE PROCEDURE REVERTER_ESTOQUE_OS_PECA();
 
 -- ------------------------------------------------------------
--- TRIGGER: OS_SERVICO — INSERT: soma valor do serviço no VALOR_FINAL
+-- 4.10 OS_SERVICO — INSERT: soma valor do serviço no VALOR_FINAL
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_E_SOMAR_SERVICO_OS()
 RETURNS TRIGGER AS $$
@@ -706,7 +757,7 @@ BEFORE INSERT ON OS_SERVICO
 FOR EACH ROW EXECUTE PROCEDURE VALIDAR_E_SOMAR_SERVICO_OS();
 
 -- ------------------------------------------------------------
--- TRIGGER: OS_SERVICO — UPDATE: reajuste do VALOR_FINAL ao trocar serviço
+-- 4.11 OS_SERVICO — UPDATE: reajuste do VALOR_FINAL ao trocar serviço
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION VALIDAR_E_AJUSTAR_SERVICO_OS()
 RETURNS TRIGGER AS $$
@@ -754,7 +805,7 @@ BEFORE UPDATE ON OS_SERVICO
 FOR EACH ROW EXECUTE PROCEDURE VALIDAR_E_AJUSTAR_SERVICO_OS();
 
 -- ------------------------------------------------------------
--- TRIGGER: OS_SERVICO — DELETE: desconto do valor do serviço no VALOR_FINAL
+-- 4.12 OS_SERVICO — DELETE: desconto do valor do serviço no VALOR_FINAL
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION REVERTER_SERVICO_OS()
 RETURNS TRIGGER AS $$
@@ -783,7 +834,7 @@ BEFORE DELETE ON OS_SERVICO
 FOR EACH ROW EXECUTE PROCEDURE REVERTER_SERVICO_OS();
 
 -- ------------------------------------------------------------
--- TRIGGER: ALERTA DE ESTOQUE BAIXO         
+-- 4.13 Alerta automático de estoque baixo
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION DISPARAR_ALERTA_ESTOQUE()
 RETURNS TRIGGER AS $$
@@ -802,12 +853,17 @@ CREATE OR REPLACE TRIGGER TRIGGER_ALERTA_ESTOQUE
 AFTER UPDATE ON PECA
 FOR EACH ROW EXECUTE PROCEDURE DISPARAR_ALERTA_ESTOQUE();
 
--- =========================================
--- FUNCOES DE CADASTRO (INSERT)
--- =========================================
 
-CREATE OR REPLACE FUNCTION CADASTRAR_CLIENTE(P_ID_CLIENTE INT,P_CPF VARCHAR,P_NOME VARCHAR,P_TELEFONE VARCHAR,P_EMAIL VARCHAR) 
-RETURNS VOID AS $$
+-- ============================================================
+-- 5. FUNÇÕES — CRUD, MOVIMENTAÇÃO E RELATÓRIOS
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 5.1 Cadastro (INSERT)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION CADASTRAR_CLIENTE(
+    P_ID_CLIENTE INT, P_CPF VARCHAR, P_NOME VARCHAR, P_TELEFONE VARCHAR, P_EMAIL VARCHAR
+) RETURNS VOID AS $$
 BEGIN
     INSERT INTO CLIENTE (ID_CLIENTE, CPF, NOME, TELEFONE, EMAIL)
     VALUES (P_ID_CLIENTE, P_CPF, P_NOME, P_TELEFONE, P_EMAIL);
@@ -815,9 +871,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION CADASTRAR_VEICULO(P_ID_VEICULO INT, P_ID_MODELO INT, P_PLACA VARCHAR, P_ANO INT, P_COR VARCHAR, P_ID_CLIENTE INT) 
-RETURNS VOID 
-AS $$
+CREATE OR REPLACE FUNCTION CADASTRAR_VEICULO(
+    P_ID_VEICULO INT, P_ID_MODELO INT, P_PLACA VARCHAR, P_ANO INT, P_COR VARCHAR, P_ID_CLIENTE INT
+) RETURNS VOID AS $$
 DECLARE
     V_MAX_POSSE INT;
 BEGIN
@@ -829,18 +885,15 @@ BEGIN
     VALUES (P_ID_VEICULO, P_ID_MODELO, P_PLACA, P_ANO, P_COR);
 
     SELECT COALESCE(MAX(ID_POSSE), 0) INTO V_MAX_POSSE FROM POSSE;
-
-    INSERT INTO POSSE (ID_POSSE, ID_VEICULO, ID_CLIENTE)
-    VALUES (V_MAX_POSSE + 1, P_ID_VEICULO, P_ID_CLIENTE);
+    INSERT INTO POSSE (ID_POSSE, ID_VEICULO, ID_CLIENTE) VALUES (V_MAX_POSSE + 1, P_ID_VEICULO, P_ID_CLIENTE);
 
     RAISE NOTICE 'VEICULO DE PLACA "%" CADASTRADO E VINCULADO AO CLIENTE DE ID %.', P_PLACA, P_ID_CLIENTE;
 END;
 $$ LANGUAGE plpgsql;
 
-
-CREATE OR REPLACE FUNCTION CADASTRAR_FUNCIONARIO(P_ID_FUNCIONARIO INT, P_ID_CARGO INT, P_CPF VARCHAR, P_NOME VARCHAR, P_SALARIO FLOAT) 
-RETURNS VOID 
-AS $$
+CREATE OR REPLACE FUNCTION CADASTRAR_FUNCIONARIO(
+    P_ID_FUNCIONARIO INT, P_ID_CARGO INT, P_CPF VARCHAR, P_NOME VARCHAR, P_SALARIO FLOAT
+) RETURNS VOID AS $$
 BEGIN
     INSERT INTO FUNCIONARIO (ID_FUNCIONARIO, ID_CARGO, CPF, NOME, SALARIO)
     VALUES (P_ID_FUNCIONARIO, P_ID_CARGO, P_CPF, P_NOME, P_SALARIO);
@@ -848,9 +901,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION CADASTRAR_SERVICO(P_ID_SERVICO INT, P_ID_FUNCIONARIO INT,P_DESCRICAO VARCHAR,P_VALOR FLOAT) 
-RETURNS VOID 
-AS $$
+CREATE OR REPLACE FUNCTION CADASTRAR_SERVICO(
+    P_ID_SERVICO INT, P_ID_FUNCIONARIO INT, P_DESCRICAO VARCHAR, P_VALOR FLOAT
+) RETURNS VOID AS $$
 BEGIN
     INSERT INTO SERVICO (ID_SERVICO, ID_FUNCIONARIO, DESCRICAO, VALOR)
     VALUES (P_ID_SERVICO, P_ID_FUNCIONARIO, P_DESCRICAO, P_VALOR);
@@ -858,10 +911,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
-CREATE OR REPLACE FUNCTION CADASTRAR_PECA(P_ID_PECA INT, P_ID_FABRICANTE INT, P_NOME VARCHAR,P_VALOR_UNITARIO FLOAT, P_ESTOQUE INT) 
-RETURNS VOID 
-AS $$
+CREATE OR REPLACE FUNCTION CADASTRAR_PECA(
+    P_ID_PECA INT, P_ID_FABRICANTE INT, P_NOME VARCHAR, P_VALOR_UNITARIO FLOAT, P_ESTOQUE INT
+) RETURNS VOID AS $$
 BEGIN
     INSERT INTO PECA (ID_PECA, ID_FABRICANTE, NOME, VALOR_UNITARIO, ESTOQUE)
     VALUES (P_ID_PECA, P_ID_FABRICANTE, P_NOME, P_VALOR_UNITARIO, P_ESTOQUE);
@@ -869,45 +921,34 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- =========================================
--- FUNCOES DE ALTERACAO (UPDATE)
--- =========================================
-
-CREATE OR REPLACE FUNCTION ALTERAR_CLIENTE(P_ID_CLIENTE INT, P_COLUNA VARCHAR, P_VALOR VARCHAR) 
-RETURNS VOID 
-AS $$
+-- ------------------------------------------------------------
+-- 5.2 Alteração (UPDATE)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION ALTERAR_CLIENTE(P_ID_CLIENTE INT, P_COLUNA VARCHAR, P_VALOR VARCHAR)
+RETURNS VOID AS $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM CLIENTE WHERE ID_CLIENTE = P_ID_CLIENTE) THEN
         RAISE EXCEPTION 'CLIENTE DE ID % NAO ENCONTRADO.', P_ID_CLIENTE;
     END IF;
-    IF P_COLUNA = 'NOME' THEN
-        UPDATE CLIENTE SET NOME = P_VALOR WHERE ID_CLIENTE = P_ID_CLIENTE;
-    ELSIF P_COLUNA = 'CPF' THEN
-        UPDATE CLIENTE SET CPF = P_VALOR WHERE ID_CLIENTE = P_ID_CLIENTE;
-    ELSIF P_COLUNA = 'TELEFONE' THEN
-        UPDATE CLIENTE SET TELEFONE = P_VALOR WHERE ID_CLIENTE = P_ID_CLIENTE;
-    ELSIF P_COLUNA = 'EMAIL' THEN
-        UPDATE CLIENTE SET EMAIL = P_VALOR WHERE ID_CLIENTE = P_ID_CLIENTE;
-    ELSE
-        RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA CLIENTE.', P_COLUNA;
+    IF    P_COLUNA = 'NOME'     THEN UPDATE CLIENTE SET NOME     = P_VALOR WHERE ID_CLIENTE = P_ID_CLIENTE;
+    ELSIF P_COLUNA = 'CPF'      THEN UPDATE CLIENTE SET CPF      = P_VALOR WHERE ID_CLIENTE = P_ID_CLIENTE;
+    ELSIF P_COLUNA = 'TELEFONE' THEN UPDATE CLIENTE SET TELEFONE = P_VALOR WHERE ID_CLIENTE = P_ID_CLIENTE;
+    ELSIF P_COLUNA = 'EMAIL'    THEN UPDATE CLIENTE SET EMAIL    = P_VALOR WHERE ID_CLIENTE = P_ID_CLIENTE;
+    ELSE  RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA CLIENTE.', P_COLUNA;
     END IF;
     RAISE NOTICE 'CLIENTE ID % | "%" ATUALIZADO PARA "%".', P_ID_CLIENTE, P_COLUNA, P_VALOR;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION ALTERAR_VEICULO(P_ID_VEICULO INT,P_COLUNA VARCHAR,P_VALOR VARCHAR) 
-RETURNS VOID 
-AS $$
-DECLARE
-    V_ANO INT;
+CREATE OR REPLACE FUNCTION ALTERAR_VEICULO(P_ID_VEICULO INT, P_COLUNA VARCHAR, P_VALOR VARCHAR)
+RETURNS VOID AS $$
+DECLARE V_ANO INT;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM VEICULO WHERE ID_VEICULO = P_ID_VEICULO) THEN
         RAISE EXCEPTION 'VEICULO DE ID % NAO ENCONTRADO.', P_ID_VEICULO;
     END IF;
-    IF P_COLUNA = 'PLACA' THEN
-        UPDATE VEICULO SET PLACA = P_VALOR WHERE ID_VEICULO = P_ID_VEICULO;
-    ELSIF P_COLUNA = 'COR' THEN
-        UPDATE VEICULO SET COR = P_VALOR WHERE ID_VEICULO = P_ID_VEICULO;
+    IF    P_COLUNA = 'PLACA'    THEN UPDATE VEICULO SET PLACA = P_VALOR WHERE ID_VEICULO = P_ID_VEICULO;
+    ELSIF P_COLUNA = 'COR'      THEN UPDATE VEICULO SET COR   = P_VALOR WHERE ID_VEICULO = P_ID_VEICULO;
     ELSIF P_COLUNA = 'ANO' THEN
         V_ANO := CAST(P_VALOR AS INT);
         UPDATE VEICULO SET ANO = V_ANO WHERE ID_VEICULO = P_ID_VEICULO;
@@ -916,26 +957,21 @@ BEGIN
             RAISE EXCEPTION 'MODELO DE ID % NAO ENCONTRADO.', P_VALOR;
         END IF;
         UPDATE VEICULO SET ID_MODELO = CAST(P_VALOR AS INT) WHERE ID_VEICULO = P_ID_VEICULO;
-    ELSE
-        RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA VEICULO.', P_COLUNA;
+    ELSE  RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA VEICULO.', P_COLUNA;
     END IF;
     RAISE NOTICE 'VEICULO ID % | "%" ATUALIZADO PARA "%".', P_ID_VEICULO, P_COLUNA, P_VALOR;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION ALTERAR_FUNCIONARIO(P_ID_FUNCIONARIO INT,P_COLUNA VARCHAR,P_VALOR VARCHAR
-) RETURNS VOID 
-AS $$
-DECLARE
-    V_SALARIO FLOAT;
+CREATE OR REPLACE FUNCTION ALTERAR_FUNCIONARIO(P_ID_FUNCIONARIO INT, P_COLUNA VARCHAR, P_VALOR VARCHAR)
+RETURNS VOID AS $$
+DECLARE V_SALARIO FLOAT;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM FUNCIONARIO WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO) THEN
         RAISE EXCEPTION 'FUNCIONARIO DE ID % NAO ENCONTRADO.', P_ID_FUNCIONARIO;
     END IF;
-    IF P_COLUNA = 'NOME' THEN
-        UPDATE FUNCIONARIO SET NOME = P_VALOR WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO;
-    ELSIF P_COLUNA = 'CPF' THEN
-        UPDATE FUNCIONARIO SET CPF = P_VALOR WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO;
+    IF    P_COLUNA = 'NOME' THEN UPDATE FUNCIONARIO SET NOME = P_VALOR WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO;
+    ELSIF P_COLUNA = 'CPF'  THEN UPDATE FUNCIONARIO SET CPF  = P_VALOR WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO;
     ELSIF P_COLUNA = 'SALARIO' THEN
         V_SALARIO := CAST(P_VALOR AS FLOAT);
         UPDATE FUNCIONARIO SET SALARIO = V_SALARIO WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO;
@@ -944,25 +980,20 @@ BEGIN
             RAISE EXCEPTION 'CARGO DE ID % NAO ENCONTRADO.', P_VALOR;
         END IF;
         UPDATE FUNCIONARIO SET ID_CARGO = CAST(P_VALOR AS INT) WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO;
-    ELSE
-        RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA FUNCIONARIO.', P_COLUNA;
+    ELSE  RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA FUNCIONARIO.', P_COLUNA;
     END IF;
     RAISE NOTICE 'FUNCIONARIO ID % | "%" ATUALIZADO PARA "%".', P_ID_FUNCIONARIO, P_COLUNA, P_VALOR;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION ALTERAR_PECA(P_ID_PECA INT,P_COLUNA VARCHAR,P_VALOR VARCHAR) 
-RETURNS VOID
-AS $$
-DECLARE
-    V_FLOAT FLOAT;
-    V_INT INT;
+CREATE OR REPLACE FUNCTION ALTERAR_PECA(P_ID_PECA INT, P_COLUNA VARCHAR, P_VALOR VARCHAR)
+RETURNS VOID AS $$
+DECLARE V_FLOAT FLOAT; V_INT INT;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM PECA WHERE ID_PECA = P_ID_PECA) THEN
         RAISE EXCEPTION 'PECA DE ID % NAO ENCONTRADA.', P_ID_PECA;
     END IF;
-    IF P_COLUNA = 'NOME' THEN
-        UPDATE PECA SET NOME = P_VALOR WHERE ID_PECA = P_ID_PECA;
+    IF    P_COLUNA = 'NOME' THEN UPDATE PECA SET NOME = P_VALOR WHERE ID_PECA = P_ID_PECA;
     ELSIF P_COLUNA = 'VALOR_UNITARIO' THEN
         V_FLOAT := CAST(P_VALOR AS FLOAT);
         UPDATE PECA SET VALOR_UNITARIO = V_FLOAT WHERE ID_PECA = P_ID_PECA;
@@ -974,24 +1005,20 @@ BEGIN
             RAISE EXCEPTION 'FABRICANTE DE ID % NAO ENCONTRADO.', P_VALOR;
         END IF;
         UPDATE PECA SET ID_FABRICANTE = CAST(P_VALOR AS INT) WHERE ID_PECA = P_ID_PECA;
-    ELSE
-        RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA PECA.', P_COLUNA;
+    ELSE  RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA PECA.', P_COLUNA;
     END IF;
     RAISE NOTICE 'PECA ID % | "%" ATUALIZADO PARA "%".', P_ID_PECA, P_COLUNA, P_VALOR;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION ALTERAR_SERVICO(P_ID_SERVICO INT, P_COLUNA VARCHAR, P_VALOR VARCHAR) 
-RETURNS VOID 
-AS $$
-DECLARE
-    V_FLOAT FLOAT;
+CREATE OR REPLACE FUNCTION ALTERAR_SERVICO(P_ID_SERVICO INT, P_COLUNA VARCHAR, P_VALOR VARCHAR)
+RETURNS VOID AS $$
+DECLARE V_FLOAT FLOAT;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM SERVICO WHERE ID_SERVICO = P_ID_SERVICO) THEN
         RAISE EXCEPTION 'SERVICO DE ID % NAO ENCONTRADO.', P_ID_SERVICO;
     END IF;
-    IF P_COLUNA = 'DESCRICAO' THEN
-        UPDATE SERVICO SET DESCRICAO = P_VALOR WHERE ID_SERVICO = P_ID_SERVICO;
+    IF    P_COLUNA = 'DESCRICAO' THEN UPDATE SERVICO SET DESCRICAO = P_VALOR WHERE ID_SERVICO = P_ID_SERVICO;
     ELSIF P_COLUNA = 'VALOR' THEN
         V_FLOAT := CAST(P_VALOR AS FLOAT);
         UPDATE SERVICO SET VALOR = V_FLOAT WHERE ID_SERVICO = P_ID_SERVICO;
@@ -1000,17 +1027,15 @@ BEGIN
             RAISE EXCEPTION 'FUNCIONARIO DE ID % NAO ENCONTRADO.', P_VALOR;
         END IF;
         UPDATE SERVICO SET ID_FUNCIONARIO = CAST(P_VALOR AS INT) WHERE ID_SERVICO = P_ID_SERVICO;
-    ELSE
-        RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA SERVICO.', P_COLUNA;
+    ELSE  RAISE EXCEPTION 'COLUNA "%" NAO EXISTE OU NAO PODE SER ALTERADA NA TABELA SERVICO.', P_COLUNA;
     END IF;
     RAISE NOTICE 'SERVICO ID % | "%" ATUALIZADO PARA "%".', P_ID_SERVICO, P_COLUNA, P_VALOR;
 END;
 $$ LANGUAGE plpgsql;
 
--- =========================================
--- FUNCOES DE EXCLUSAO (DELETE)
--- =========================================
-
+-- ------------------------------------------------------------
+-- 5.3 Exclusão (DELETE)
+-- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION DELETAR_CLIENTE(P_ID_CLIENTE INT) RETURNS VOID AS $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM CLIENTE WHERE ID_CLIENTE = P_ID_CLIENTE) THEN
@@ -1024,17 +1049,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION DELETAR_VEICULO(P_ID_VEICULO INT) 
-RETURNS VOID 
-AS $$
+CREATE OR REPLACE FUNCTION DELETAR_VEICULO(P_ID_VEICULO INT) RETURNS VOID AS $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM VEICULO WHERE ID_VEICULO = P_ID_VEICULO) THEN
         RAISE EXCEPTION 'VEICULO DE ID % NAO ENCONTRADO.', P_ID_VEICULO;
     END IF;
     IF EXISTS (
-        SELECT 1 FROM POSSE PO
-        JOIN OS O ON O.ID_POSSE = PO.ID_POSSE
-        WHERE PO.ID_VEICULO = P_ID_VEICULO
+        SELECT 1 FROM POSSE PO JOIN OS O ON O.ID_POSSE = PO.ID_POSSE WHERE PO.ID_VEICULO = P_ID_VEICULO
     ) THEN
         RAISE EXCEPTION 'NAO E POSSIVEL EXCLUIR O VEICULO ID %: ELE POSSUI ORDENS DE SERVICO VINCULADAS.', P_ID_VEICULO;
     END IF;
@@ -1057,9 +1078,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION DELETAR_PECA(P_ID_PECA INT) 
-RETURNS VOID 
-AS $$
+CREATE OR REPLACE FUNCTION DELETAR_PECA(P_ID_PECA INT) RETURNS VOID AS $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM PECA WHERE ID_PECA = P_ID_PECA) THEN
         RAISE EXCEPTION 'PECA DE ID % NAO ENCONTRADA.', P_ID_PECA;
@@ -1085,60 +1104,42 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- =========================================
--- MOVIMENTACAO: ABERTURA, ITENS E FECHAMENTO
--- =========================================
-
-CREATE OR REPLACE FUNCTION ABRIR_OS(
-    P_ID_OS INT,
-    P_ID_POSSE INT
-) 
-RETURNS VOID AS $$
+-- ------------------------------------------------------------
+-- 5.4 Movimentação de OS
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION ABRIR_OS(P_ID_OS INT, P_ID_POSSE INT) RETURNS VOID AS $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM POSSE WHERE ID_POSSE = P_ID_POSSE) THEN
         RAISE EXCEPTION 'POSSE DE ID % NAO ENCONTRADA.', P_ID_POSSE;
     END IF;
-    INSERT INTO OS (ID_OS, ID_POSSE, STATUS, VALOR_FINAL)
-    VALUES (P_ID_OS, P_ID_POSSE, 'A', 0);
+    INSERT INTO OS (ID_OS, ID_POSSE, STATUS, VALOR_FINAL) VALUES (P_ID_OS, P_ID_POSSE, 'A', 0);
     RAISE NOTICE 'OS % ABERTA COM SUCESSO. ADICIONE SERVICOS E PECAS.', P_ID_OS;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION ADICIONAR_SERVICO_OS(
-    P_ID_OS_SERVICO INT,
-    P_ID_OS         INT,
-    P_ID_SERVICO    INT
-) RETURNS VOID AS $$
-DECLARE
-    V_DESCRICAO VARCHAR;
-    V_VALOR     FLOAT;
+CREATE OR REPLACE FUNCTION ADICIONAR_SERVICO_OS(P_ID_OS_SERVICO INT, P_ID_OS INT, P_ID_SERVICO INT)
+RETURNS VOID AS $$
+DECLARE V_DESCRICAO VARCHAR; V_VALOR FLOAT;
 BEGIN
-    INSERT INTO OS_SERVICO (ID_OS_SERVICO, ID_OS, ID_SERVICO)
-    VALUES (P_ID_OS_SERVICO, P_ID_OS, P_ID_SERVICO);
-    SELECT DESCRICAO, VALOR INTO V_DESCRICAO, V_VALOR
-    FROM SERVICO WHERE ID_SERVICO = P_ID_SERVICO;
+    INSERT INTO OS_SERVICO (ID_OS_SERVICO, ID_OS, ID_SERVICO) VALUES (P_ID_OS_SERVICO, P_ID_OS, P_ID_SERVICO);
+    SELECT DESCRICAO, VALOR INTO V_DESCRICAO, V_VALOR FROM SERVICO WHERE ID_SERVICO = P_ID_SERVICO;
     RAISE NOTICE 'SERVICO "%" (R$%) ADICIONADO A OS %.', V_DESCRICAO, V_VALOR, P_ID_OS;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION ADICIONAR_PECA_OS(
-    P_ID_OS_PECA INT,
-    P_ID_OS      INT,
-    P_ID_PECA    INT,
-    P_QUANTIDADE INT
-) RETURNS VOID AS $$
-DECLARE
-    V_NOME_PECA  VARCHAR;
-    V_VALOR_UNIT FLOAT;
+CREATE OR REPLACE FUNCTION ADICIONAR_PECA_OS(P_ID_OS_PECA INT, P_ID_OS INT, P_ID_PECA INT, P_QUANTIDADE INT)
+RETURNS VOID AS $$
+DECLARE V_NOME_PECA VARCHAR; V_VALOR_UNIT FLOAT;
 BEGIN
-    INSERT INTO OS_PECA (ID_OS_PECA, ID_OS, ID_PECA, QUANTIDADE)
-    VALUES (P_ID_OS_PECA, P_ID_OS, P_ID_PECA, P_QUANTIDADE);
-    SELECT NOME, VALOR_UNITARIO INTO V_NOME_PECA, V_VALOR_UNIT
-    FROM PECA WHERE ID_PECA = P_ID_PECA;
+    INSERT INTO OS_PECA (ID_OS_PECA, ID_OS, ID_PECA, QUANTIDADE) VALUES (P_ID_OS_PECA, P_ID_OS, P_ID_PECA, P_QUANTIDADE);
+    SELECT NOME, VALOR_UNITARIO INTO V_NOME_PECA, V_VALOR_UNIT FROM PECA WHERE ID_PECA = P_ID_PECA;
     RAISE NOTICE 'PECA "%" (% un. x R$%) ADICIONADA A OS %.', V_NOME_PECA, P_QUANTIDADE, V_VALOR_UNIT, P_ID_OS;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Regra de fechamento: exige ao menos um serviço OU uma peça.
+-- OS completamente vazia não pode ser fechada.
+-- OS só com serviços (diagnóstico/mão de obra) ou só com peças (venda balcão) são permitidas.
 CREATE OR REPLACE FUNCTION FECHAR_OS(P_ID_OS INT) RETURNS VOID AS $$
 DECLARE
     V_STATUS      VARCHAR(1);
@@ -1173,14 +1174,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- =========================================
--- REPOSICAO DE ESTOQUE
--- =========================================
-
-CREATE OR REPLACE FUNCTION REPOR_ESTOQUE(
-    P_ID_PECA    INT,
-    P_QUANTIDADE INT
-) RETURNS VOID AS $$
+-- ------------------------------------------------------------
+-- 5.5 Estoque
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION REPOR_ESTOQUE(P_ID_PECA INT, P_QUANTIDADE INT) RETURNS VOID AS $$
 DECLARE
     V_NOME_PECA   VARCHAR;
     V_ESTOQUE_ANT INT;
@@ -1192,51 +1189,38 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM PECA WHERE ID_PECA = P_ID_PECA) THEN
         RAISE EXCEPTION 'PECA DE ID % NAO ENCONTRADA.', P_ID_PECA;
     END IF;
-    SELECT NOME, ESTOQUE INTO V_NOME_PECA, V_ESTOQUE_ANT
-    FROM PECA WHERE ID_PECA = P_ID_PECA;
-    UPDATE PECA
-    SET ESTOQUE = ESTOQUE + P_QUANTIDADE
-    WHERE ID_PECA = P_ID_PECA
-    RETURNING ESTOQUE INTO V_ESTOQUE_NOV;
+    SELECT NOME, ESTOQUE INTO V_NOME_PECA, V_ESTOQUE_ANT FROM PECA WHERE ID_PECA = P_ID_PECA;
+    UPDATE PECA SET ESTOQUE = ESTOQUE + P_QUANTIDADE WHERE ID_PECA = P_ID_PECA RETURNING ESTOQUE INTO V_ESTOQUE_NOV;
     RAISE NOTICE 'PECA "%" | ESTOQUE: % -> % (+% UNIDADES).', V_NOME_PECA, V_ESTOQUE_ANT, V_ESTOQUE_NOV, P_QUANTIDADE;
 END;
 $$ LANGUAGE plpgsql;
 
--- =========================================
--- RELATORIOS
--- =========================================
+-- ------------------------------------------------------------
+-- 5.6 Relatórios
+-- ------------------------------------------------------------
 
+-- Faturamento de um mês específico (apenas OS fechadas com valor > 0)
 CREATE OR REPLACE FUNCTION RELATORIO_FATURAMENTO(P_ANO INT, P_MES INT)
-RETURNS TABLE (
-    TOTAL_OS     INT,
-    FATURAMENTO  FLOAT,
-    TICKET_MEDIO FLOAT
-) AS $$
-DECLARE
-    V_TOTAL INT;
-    V_SOMA  FLOAT;
-    V_MEDIA FLOAT;
+RETURNS TABLE (TOTAL_OS INT, FATURAMENTO FLOAT, TICKET_MEDIO FLOAT) AS $$
+DECLARE V_TOTAL INT; V_SOMA FLOAT; V_MEDIA FLOAT;
 BEGIN
     IF P_MES < 1 OR P_MES > 12 THEN
         RAISE EXCEPTION 'MES INVALIDO: INFORME UM VALOR ENTRE 1 E 12.';
     END IF;
-
     SELECT COUNT(*), COALESCE(SUM(VALOR_FINAL), 0), COALESCE(AVG(VALOR_FINAL), 0)
-    INTO V_TOTAL, V_SOMA, V_MEDIA 
-    FROM OS WHERE STATUS = 'F' AND VALOR_FINAL  > 0 AND EXTRACT(YEAR  FROM DT_FECHA_OS) = P_ANO AND EXTRACT(MONTH FROM DT_FECHA_OS) = P_MES;
-
-    RETURN QUERY
-    SELECT V_TOTAL, V_SOMA, V_MEDIA;
+    INTO V_TOTAL, V_SOMA, V_MEDIA
+    FROM OS
+    WHERE STATUS = 'F'
+      AND VALOR_FINAL > 0
+      AND EXTRACT(YEAR  FROM DT_FECHA_OS) = P_ANO
+      AND EXTRACT(MONTH FROM DT_FECHA_OS) = P_MES;
+    RETURN QUERY SELECT V_TOTAL, V_SOMA, V_MEDIA;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Peças mais utilizadas em OS fechadas
 CREATE OR REPLACE FUNCTION RELATORIO_PECAS_MAIS_USADAS()
-RETURNS TABLE (
-    ID_PECA       INT,
-    NOME_PECA     VARCHAR,
-    TOTAL_USADA   INT,
-    TOTAL_VENDIDO FLOAT
-) AS $$
+RETURNS TABLE (ID_PECA INT, NOME_PECA VARCHAR, TOTAL_USADA INT, TOTAL_VENDIDO FLOAT) AS $$
 BEGIN
     RETURN QUERY
     SELECT
@@ -1245,19 +1229,17 @@ BEGIN
         SUM(OP.QUANTIDADE)                    AS TOTAL_USADA,
         SUM(OP.QUANTIDADE * P.VALOR_UNITARIO) AS TOTAL_VENDIDO
     FROM OS_PECA OP
-    JOIN PECA P ON P.ID_PECA = OP.ID_PECA
-    JOIN OS   O ON O.ID_OS   = OP.ID_OS
+        JOIN PECA P ON P.ID_PECA = OP.ID_PECA
+        JOIN OS   O ON O.ID_OS   = OP.ID_OS
     WHERE O.STATUS = 'F'
     GROUP BY P.ID_PECA, P.NOME
     ORDER BY TOTAL_USADA DESC;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION CALCULAR_COMISSAO(
-    P_ID_FUNCIONARIO INT,
-    P_ANO            INT,
-    P_MES            INT
-) RETURNS FLOAT AS $$
+-- Comissão individual de um funcionário em um mês
+CREATE OR REPLACE FUNCTION CALCULAR_COMISSAO(P_ID_FUNCIONARIO INT, P_ANO INT, P_MES INT)
+RETURNS FLOAT AS $$
 DECLARE
     V_NOME_FUNC  VARCHAR;
     V_NOME_CARGO VARCHAR;
@@ -1275,15 +1257,14 @@ BEGIN
 
     SELECT F.NOME, C.NOME, C.COMISSAO
     INTO V_NOME_FUNC, V_NOME_CARGO, V_COMISSAO
-    FROM FUNCIONARIO F
-    JOIN CARGO C ON C.ID_CARGO = F.ID_CARGO
+    FROM FUNCIONARIO F JOIN CARGO C ON C.ID_CARGO = F.ID_CARGO
     WHERE F.ID_FUNCIONARIO = P_ID_FUNCIONARIO;
 
     SELECT COALESCE(SUM(S.VALOR), 0)
     INTO V_TOTAL_SERV
     FROM OS_SERVICO OSS
-    JOIN OS O ON O.ID_OS = OSS.ID_OS
-    JOIN SERVICO S ON S.ID_SERVICO = OSS.ID_SERVICO
+        JOIN OS      O ON O.ID_OS        = OSS.ID_OS
+        JOIN SERVICO S ON S.ID_SERVICO   = OSS.ID_SERVICO
     WHERE S.ID_FUNCIONARIO = P_ID_FUNCIONARIO
       AND O.STATUS = 'F'
       AND EXTRACT(YEAR  FROM O.DT_FECHA_OS) = P_ANO
@@ -1299,20 +1280,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Relatório de comissões de todos os funcionários em um mês
 CREATE OR REPLACE FUNCTION RELATORIO_COMISSOES(P_ANO INT, P_MES INT)
 RETURNS TABLE (
-    ID_FUNC        INT,
-    NOME_FUNC      VARCHAR,
-    CARGO          VARCHAR,
-    TOTAL_SERVICO  FLOAT,
-    COMISSAO_PERC  FLOAT,
-    VALOR_COMISSAO FLOAT
+    ID_FUNC INT, NOME_FUNC VARCHAR, CARGO VARCHAR,
+    TOTAL_SERVICO FLOAT, COMISSAO_PERC FLOAT, VALOR_COMISSAO FLOAT
 ) AS $$
 BEGIN
     IF P_MES < 1 OR P_MES > 12 THEN
         RAISE EXCEPTION 'MES INVALIDO: INFORME UM VALOR ENTRE 1 E 12.';
     END IF;
-
     RETURN QUERY
     SELECT
         F.ID_FUNCIONARIO,
@@ -1322,13 +1299,13 @@ BEGIN
         C.COMISSAO,
         COALESCE(SUM(S.VALOR), 0) * C.COMISSAO AS VALOR_COMISSAO
     FROM FUNCIONARIO F
-    JOIN CARGO C ON C.ID_CARGO = F.ID_CARGO
-    LEFT JOIN SERVICO    S   ON S.ID_FUNCIONARIO = F.ID_FUNCIONARIO
-    LEFT JOIN OS_SERVICO OSS ON OSS.ID_SERVICO   = S.ID_SERVICO
-    LEFT JOIN OS         O   ON O.ID_OS           = OSS.ID_OS
-                             AND O.STATUS = 'F'
-                             AND EXTRACT(YEAR  FROM O.DT_FECHA_OS) = P_ANO
-                             AND EXTRACT(MONTH FROM O.DT_FECHA_OS) = P_MES
+        JOIN CARGO C ON C.ID_CARGO = F.ID_CARGO
+        LEFT JOIN SERVICO    S   ON S.ID_FUNCIONARIO = F.ID_FUNCIONARIO
+        LEFT JOIN OS_SERVICO OSS ON OSS.ID_SERVICO   = S.ID_SERVICO
+        LEFT JOIN OS         O   ON O.ID_OS           = OSS.ID_OS
+                                AND O.STATUS = 'F'
+                                AND EXTRACT(YEAR  FROM O.DT_FECHA_OS) = P_ANO
+                                AND EXTRACT(MONTH FROM O.DT_FECHA_OS) = P_MES
     GROUP BY F.ID_FUNCIONARIO, F.NOME, C.NOME, C.COMISSAO
     ORDER BY VALOR_COMISSAO DESC;
 END;
@@ -1336,49 +1313,36 @@ $$ LANGUAGE plpgsql;
 
 
 -- ============================================================
--- DCL — PAPÉIS, PERMISSÕES E USUÁRIOS
+-- 6. DCL — PAPÉIS, PERMISSÕES E USUÁRIOS
 -- ============================================================
 
 -- ------------------------------------------------------------
--- Criação dos papéis 
+-- 6.1 Criação dos papéis (roles)
 -- ------------------------------------------------------------
 
---  gerente -> Acesso total ao sistema, relatórios, gestão de usuários
+-- Acesso total ao sistema (relatórios, gestão de usuários)
 CREATE ROLE role_gerente;
 
--- recepção -> cadastro, OS, atendimento ao cliente
+-- Operacional da recepção (cadastro, OS, atendimento ao cliente)
 CREATE ROLE role_atendente;
 
--- mecanico -> consulta de OS e estoque, sem dados pessoais
+-- Chão de fábrica (consulta de OS e estoque, sem dados pessoais)
 CREATE ROLE role_mecanico;
 
--- cliente -> somente leitura do status da própria OS
+-- Acesso externo mínimo (somente leitura do status da própria OS)
 CREATE ROLE role_cliente;
 
 -- ------------------------------------------------------------
--- Permissões do GERENTE — acesso total
+-- 6.2 Permissões do GERENTE — acesso total
 -- ------------------------------------------------------------
 GRANT ALL PRIVILEGES ON TABLE
-    FABRICANTE, 
-    MODELO, 
-    VEICULO, 
-    CARGO, 
-    FUNCIONARIO, 
-    PECA,
-    CLIENTE, 
-    POSSE, 
-    SERVICO, 
-    OS, 
-    OS_SERVICO, 
-    OS_PECA
+    FABRICANTE, MODELO, VEICULO, CARGO, FUNCIONARIO, PECA,
+    CLIENTE, POSSE, SERVICO, OS, OS_SERVICO, OS_PECA
 TO role_gerente;
 
 GRANT ALL PRIVILEGES ON TABLE
-    VISUALIZAR_OS, 
-    VISUALIZAR_OS_ABERTAS, 
-    VISUALIZAR_OS_FECHADAS,
-    VW_OS_ABERTAS_MECANICO, 
-    VW_FUNCIONARIO_SEM_SALARIO
+    VISUALIZAR_OS, VISUALIZAR_OS_ABERTAS, VISUALIZAR_OS_FECHADAS,
+    VW_OS_ABERTAS_MECANICO, VW_FUNCIONARIO_SEM_SALARIO
 TO role_gerente;
 
 GRANT EXECUTE ON FUNCTION
@@ -1409,11 +1373,12 @@ GRANT EXECUTE ON FUNCTION
 TO role_gerente;
 
 -- ------------------------------------------------------------
--- Permissões do atendente — cadastro e movimentação de OS
+-- 6.3 Permissões do ATENDENTE — cadastro e movimentação de OS
 -- ------------------------------------------------------------
 GRANT SELECT, INSERT, UPDATE ON TABLE CLIENTE, VEICULO, POSSE, OS TO role_atendente;
 
 -- Permite corrigir ou remover itens de OS abertas
+-- (triggers garantem reversão automática e bloqueio em OS fechada)
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE OS_SERVICO, OS_PECA TO role_atendente;
 
 -- Leitura para consulta e preenchimento de orçamentos
@@ -1447,7 +1412,7 @@ REVOKE EXECUTE ON FUNCTION
 FROM role_atendente;
 
 -- ------------------------------------------------------------
--- Permissões do mecanico — Consulta de OS e estoque
+-- 6.4 Permissões do MECÂNICO — consulta restrita ao chão de fábrica
 -- ------------------------------------------------------------
 
 -- View dedicada: OS abertas sem CPF, e-mail ou telefone do cliente
@@ -1460,42 +1425,30 @@ GRANT SELECT ON TABLE VEICULO, MODELO, FABRICANTE TO role_mecanico;
 GRANT SELECT (ID_PECA, ID_FABRICANTE, NOME, ESTOQUE) ON TABLE PECA TO role_mecanico;
 
 -- Restrições explícitas do mecânico
-REVOKE ALL ON TABLE CLIENTE FROM role_mecanico;
-REVOKE ALL ON TABLE OS FROM role_mecanico;
+REVOKE ALL ON TABLE CLIENTE    FROM role_mecanico;
+REVOKE ALL ON TABLE OS         FROM role_mecanico;
 REVOKE ALL ON TABLE FUNCIONARIO FROM role_mecanico;
 REVOKE ALL ON TABLE OS_SERVICO FROM role_mecanico;
-REVOKE ALL ON TABLE OS_PECA FROM role_mecanico;
+REVOKE ALL ON TABLE OS_PECA    FROM role_mecanico;
 
 -- ------------------------------------------------------------
--- Permissões do cliente — somente status da própria OS
+-- 6.5 Permissões do CLIENTE — somente status da própria OS
 -- ------------------------------------------------------------
 GRANT SELECT ON TABLE VISUALIZAR_OS TO role_cliente;
 
 -- Restrições explícitas do cliente
 REVOKE ALL ON TABLE
-    FABRICANTE, 
-    MODELO, 
-    VEICULO, 
-    CARGO, 
-    FUNCIONARIO, 
-    PECA,
-    CLIENTE, 
-    POSSE, 
-    SERVICO, 
-    OS, 
-    OS_SERVICO, 
-    OS_PECA
+    FABRICANTE, MODELO, VEICULO, CARGO, FUNCIONARIO, PECA,
+    CLIENTE, POSSE, SERVICO, OS, OS_SERVICO, OS_PECA
 FROM role_cliente;
 
 REVOKE ALL ON TABLE
-    VISUALIZAR_OS_ABERTAS, 
-    VISUALIZAR_OS_FECHADAS,
-    VW_OS_ABERTAS_MECANICO, 
-    VW_FUNCIONARIO_SEM_SALARIO
+    VISUALIZAR_OS_ABERTAS, VISUALIZAR_OS_FECHADAS,
+    VW_OS_ABERTAS_MECANICO, VW_FUNCIONARIO_SEM_SALARIO
 FROM role_cliente;
 
 -- ------------------------------------------------------------
--- Criação dos usuários
+-- 6.6 Criação dos usuários
 -- ------------------------------------------------------------
 CREATE USER erwin_gerente      WITH PASSWORD 'gerente1234'   IN ROLE role_gerente;
 CREATE USER sakamoto_atendente WITH PASSWORD 'atendente1234' IN ROLE role_atendente;
