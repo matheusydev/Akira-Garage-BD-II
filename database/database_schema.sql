@@ -1274,3 +1274,197 @@ CREATE OR REPLACE TRIGGER TRIGGER_ALERTA_ESTOQUE
 AFTER UPDATE ON PECA
 FOR EACH ROW
 EXECUTE PROCEDURE DISPARAR_ALERTA_ESTOQUE();
+
+-- =========================================
+-- DCL — SEGURANÇA E DIREITOS DE ACESSO
+-- =========================================
+
+-- =========================================
+-- VIEWS AUXILIARES DE SEGURANÇA
+-- =========================================
+
+-- View para o Mecânico: OS abertas sem dados pessoais do cliente Remove CPF, EMAIL e TELEFONE — o mecânico não precisa dessas informações.
+CREATE OR REPLACE VIEW VW_OS_ABERTAS_MECANICO AS
+SELECT ID_OS, CLIENTE, VEICULO, PLACA, ANO, COR, DESCRICAO FROM VISUALIZAR_OS WHERE STATUS = 'A';
+
+
+-- View para o Atendente: tabela FUNCIONARIO sem a coluna SALARIO O atendente precisa vincular um funcionário a um serviço, mas não tem direito de ver quanto cada colega ganha.
+CREATE OR REPLACE VIEW VW_FUNCIONARIO_SEM_SALARIO AS
+SELECT ID_FUNCIONARIO, ID_CARGO, CPF, NOME FROM FUNCIONARIO; 
+
+-- =========================================
+-- PAPÉIS (ROLEs)
+-- =========================================
+
+-- Gerente: pode criar e gerenciar outros usuários
+CREATE ROLE role_gerente ;
+
+-- Atendente: papel operacional da recepção
+CREATE ROLE role_atendente;
+
+-- Mecânico: acesso restrito ao chão de fábrica
+CREATE ROLE role_mecanico;
+
+-- Cliente externo: acesso mínimo, somente leitura de status
+CREATE ROLE role_cliente;
+
+-- =========================================
+-- PRIVILÉGIOS
+-- =========================================
+
+-- -----------------------------------------
+-- ROLE_GERENTE — Acesso total ao sistema
+-- -----------------------------------------
+
+-- Tabelas: acesso completo a todas
+GRANT ALL PRIVILEGES 
+ON TABLE FABRICANTE, MODELO, VEICULO, CARGO, FUNCIONARIO, PECA, CLIENTE, POSSE, SERVICO, OS, OS_SERVICO, OS_PECA 
+TO role_gerente;
+
+-- Views: acesso completo a todas, incluindo as auxiliares
+GRANT ALL PRIVILEGES 
+ON TABLE VISUALIZAR_OS, VISUALIZAR_OS_ABERTAS, VISUALIZAR_OS_FECHADAS, VW_OS_ABERTAS_MECANICO VW_FUNCIONARIO_SEM_SALARIO 
+TO role_gerente;
+
+-- Funções de cadastro (INSERT)
+GRANT EXECUTE ON FUNCTION
+    CADASTRAR_CLIENTE(INT, VARCHAR, VARCHAR, VARCHAR, VARCHAR),
+    CADASTRAR_VEICULO(INT, INT, VARCHAR, INT, VARCHAR, INT),
+    CADASTRAR_FUNCIONARIO(INT, INT, VARCHAR, VARCHAR, FLOAT),
+    CADASTRAR_SERVICO(INT, INT, VARCHAR, FLOAT),
+    CADASTRAR_PECA(INT, INT, VARCHAR, FLOAT, INT)
+TO role_gerente;
+
+-- Funções de alteração (UPDATE)
+GRANT EXECUTE ON FUNCTION
+    ALTERAR_CLIENTE(INT, VARCHAR, VARCHAR),
+    ALTERAR_VEICULO(INT, VARCHAR, VARCHAR),
+    ALTERAR_FUNCIONARIO(INT, VARCHAR, VARCHAR),
+    ALTERAR_PECA(INT, VARCHAR, VARCHAR),
+    ALTERAR_SERVICO(INT, VARCHAR, VARCHAR)
+TO role_gerente;
+
+-- Funções de exclusão (DELETE)
+GRANT EXECUTE ON FUNCTION
+    DELETAR_CLIENTE(INT),
+    DELETAR_VEICULO(INT),
+    DELETAR_FUNCIONARIO(INT),
+    DELETAR_PECA(INT),
+    DELETAR_SERVICO(INT)
+TO role_gerente;
+
+-- Funções de movimentação de OS
+GRANT EXECUTE ON FUNCTION
+    ABRIR_OS(INT, INT),
+    ADICIONAR_SERVICO_OS(INT, INT, INT),
+    ADICIONAR_PECA_OS(INT, INT, INT, INT),
+    FECHAR_OS(INT)
+TO role_gerente;
+
+-- Funções de estoque
+GRANT EXECUTE ON FUNCTION
+    REPOR_ESTOQUE(INT, INT)
+TO role_gerente;
+
+-- Funções de relatório (exclusivas do gerente)
+GRANT EXECUTE ON FUNCTION
+    RELATORIO_FATURAMENTO(INT, INT),
+    RELATORIO_PECAS_MAIS_USADAS(),
+    RELATORIO_COMISSOES(INT, INT),
+    CALCULAR_COMISSAO(INT, INT, INT)
+TO role_gerente;
+
+
+-- -----------------------------------------
+-- ROLE_ATENDENTE — Cadastro de clientes, veículos e OS
+-- -----------------------------------------
+
+-- Tabelas com leitura e escrita 
+GRANT SELECT, INSERT, UPDATE ON TABLE CLIENTE, VEICULO, POSSE, OS, OS_SERVICO, OS_PECA
+TO role_atendente;
+
+-- Tabelas somente leitura (consulta para preencher orçamentos)
+GRANT SELECT ON TABLE PECA, SERVICO, MODELO, FABRICANTE, CARGO
+TO role_atendente;
+
+-- View de funcionário SEM salário (para vincular mecânico ao serviço)
+GRANT SELECT ON TABLE VW_FUNCIONARIO_SEM_SALARIO 
+TO role_atendente;
+
+-- Views de OS (para acompanhar o atendimento)
+GRANT SELECT ON TABLE VISUALIZAR_OS, VISUALIZAR_OS_ABERTAS, VISUALIZAR_OS_FECHADAS
+TO role_atendente;
+
+-- Funções de cadastro e alteração de clientes e veículos
+GRANT EXECUTE ON FUNCTION
+    CADASTRAR_CLIENTE(INT, VARCHAR, VARCHAR, VARCHAR, VARCHAR),
+    CADASTRAR_VEICULO(INT, INT, VARCHAR, INT, VARCHAR, INT),
+    ALTERAR_CLIENTE(INT, VARCHAR, VARCHAR),
+    ALTERAR_VEICULO(INT, VARCHAR, VARCHAR)
+TO role_atendente;
+
+-- Funções de movimentação de OS
+GRANT EXECUTE ON FUNCTION
+    ABRIR_OS(INT, INT),
+    ADICIONAR_SERVICO_OS(INT, INT, INT),
+    ADICIONAR_PECA_OS(INT, INT, INT, INT),
+    FECHAR_OS(INT)
+TO role_atendente;
+
+REVOKE ALL ON TABLE FUNCIONARIO FROM role_atendente;
+REVOKE EXECUTE ON FUNCTION
+    RELATORIO_FATURAMENTO(INT, INT),
+    RELATORIO_PECAS_MAIS_USADAS(),
+    RELATORIO_COMISSOES(INT, INT),
+    CALCULAR_COMISSAO(INT, INT, INT)
+FROM role_atendente;
+
+
+-- -----------------------------------------
+-- ROLE_MECANICO — Consulta de OS e estoque
+-- -----------------------------------------
+-- View dedicada: OS abertas SEM dados pessoais do cliente
+GRANT SELECT ON TABLE VW_OS_ABERTAS_MECANICO TO role_mecanico;
+
+-- leitura de tabela
+GRANT SELECT ON TABLE
+    VEICULO, MODELO, FABRICANTE
+TO role_mecanico;
+
+GRANT SELECT (ID_PECA, ID_FABRICANTE, NOME, ESTOQUE) ON TABLE PECA 
+TO role_mecanico;
+
+-- RESTRIÇÕES EXPLÍCITAS DO MECÂNICO:
+REVOKE ALL ON TABLE CLIENTE FROM role_mecanico;
+REVOKE ALL ON TABLE OS FROM role_mecanico;
+REVOKE ALL ON TABLE FUNCIONARIO FROM role_mecanico;
+REVOKE ALL ON TABLE OS_SERVICO FROM role_mecanico;
+REVOKE ALL ON TABLE OS_PECA FROM role_mecanico;
+
+-- -----------------------------------------
+-- ROLE_CLIENTE — Visualização do status da OS
+-- -----------------------------------------
+
+-- Somente a view geral de OS: filtra por CPF/ID do cliente
+GRANT SELECT ON TABLE VISUALIZAR_OS TO role_cliente;
+
+-- RESTRIÇÕES EXPLÍCITAS DO CLIENTE:
+REVOKE ALL ON TABLE
+    FABRICANTE, MODELO, VEICULO, CARGO, FUNCIONARIO, PECA, CLIENTE, POSSE, SERVICO, OS, OS_SERVICO, OS_PECA
+FROM role_cliente;
+
+REVOKE ALL ON TABLE VISUALIZAR_OS_ABERTAS, VISUALIZAR_OS_FECHADAS, VW_OS_ABERTAS_MECANICO, VW_FUNCIONARIO_SEM_SALARIO FROM role_cliente;
+
+-- =========================================
+-- CRIAÇÃO DOS USUÁRIOS
+-- =========================================
+
+CREATE USER erwin_gerente WITH PASSWORD 'gerente1234' IN ROLE role_gerente;
+
+CREATE USER sakamoto_atendente WITH PASSWORD 'atendente1234' IN ROLE role_atendente;
+
+CREATE USER winry_mecanico WITH PASSWORD 'mecanico1234' IN ROLE role_mecanico;
+
+CREATE USER Krauser_cliente WITH PASSWORD 'cliente1234' IN ROLE role_cliente;
+
+
